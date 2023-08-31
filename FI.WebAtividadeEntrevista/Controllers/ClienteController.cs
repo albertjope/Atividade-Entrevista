@@ -7,25 +7,21 @@ using System.Web;
 using System.Web.Mvc;
 using FI.AtividadeEntrevista.DML;
 using AutoMapper;
+using WebAtividadeEntrevista.Services.Clientes;
 
 namespace WebAtividadeEntrevista.Controllers
 {
     public class ClienteController : Controller
     {
-        private IMapper mapper;
-        private BoCliente _boCliente = new BoCliente();
-        private BoBeneficiario _boBeneficiario = new BoBeneficiario();
-        public ClienteController()
+        
+        private IServiceCliente _serviceCliente;
+        private IServiceBeneficiario _serviceBeneficiario;
+
+        public ClienteController(IServiceBeneficiario serviceBeneficiario, IServiceCliente serviceCliente)
         {
-            var configuration = new MapperConfiguration(cfg =>
-            {
-                cfg.AddProfile<ClienteProfile>();
-                cfg.AddProfile<BeneficiarioProfile>();
-            });
-
-            mapper = configuration.CreateMapper();
+            this._serviceBeneficiario = serviceBeneficiario;
+            this._serviceCliente = serviceCliente;
         }
-
 
         public ActionResult Index()
         {
@@ -53,16 +49,10 @@ namespace WebAtividadeEntrevista.Controllers
             }
             else
             {
-                // valida o cpf informado
-                if (!_boCliente.VerificarExistencia(model.CPF))
-                {
-                    model.Id = _boCliente.Incluir(mapper.Map<Cliente>(model));
+                if (_serviceCliente.Incluir(model) > 0)
                     return Json("Cadastro efetuado com sucesso");
-                }
                 else
-                {
                     return Json("Não foi possível efetuar a gravação. O CPF informado já existe na base de dados.");
-                }
 
             }
         }
@@ -81,23 +71,25 @@ namespace WebAtividadeEntrevista.Controllers
             }
             else
             {
-                _boCliente.Alterar(mapper.Map<Cliente>(model));
-                return Json("Cadastro alterado com sucesso");
+                try
+                {
+                    _serviceCliente.Alterar(model);
+                    return Json("Cadastro alterado com sucesso");
+                }catch (Exception ex)
+                {
+                    return Json("Não foi possível efetuar a gravação. Ocorreram erros na gravação dos dados.");
+
+                }
+
             }
         }
 
         [HttpGet]
         public ActionResult Alterar(long id)
         {
-            Cliente cliente = _boCliente.Consultar(id);
-            Models.ClienteModel model = null;
+            ClienteModel cliente = _serviceCliente.Consultar(id);
 
-            if (cliente != null)
-            {
-                model = mapper.Map<ClienteModel>(cliente);
-            }
-
-            return View(model);
+            return View(cliente);
         }
 
         [HttpPost]
@@ -116,7 +108,7 @@ namespace WebAtividadeEntrevista.Controllers
                 if (array.Length > 1)
                     crescente = array[1];
 
-                List<Cliente> clientes = _boCliente.Pesquisa(jtStartIndex, jtPageSize, campo, crescente.Equals("ASC", StringComparison.InvariantCultureIgnoreCase), out qtd);
+                List<ClienteModel> clientes = _serviceCliente.ListarClientes(jtStartIndex, jtPageSize, campo, crescente.Equals("ASC", StringComparison.InvariantCultureIgnoreCase), out qtd);
 
                 //Return result to jTable
                 return Json(new { Result = "OK", Records = clientes, TotalRecordCount = qtd });
@@ -132,8 +124,7 @@ namespace WebAtividadeEntrevista.Controllers
         {
             try
             {
-                
-                List<Beneficiario> beneficiarios = _boBeneficiario.Listar(model.Id);
+                List<BeneficiarioModel> beneficiarios = _serviceBeneficiario.ListarBeneficiarios(model.Id);
 
                 //Return result to jTable
                 return Json(new { Result = "OK", Records = beneficiarios, TotalRecordCount = beneficiarios.Count });
@@ -158,14 +149,14 @@ namespace WebAtividadeEntrevista.Controllers
             }
             else
             {
-                model.Id = _boBeneficiario.Incluir(mapper.Map<Beneficiario>(model));
+                model.Id = _serviceBeneficiario.IncluirBeneficiario(model);
                 return Json("Cadastro efetuado com sucesso");
             }
         }
         [HttpDelete]
         public JsonResult ExcluirBeneficiario(long Id)
         {
-            _boBeneficiario.Excluir(Id);
+            _serviceBeneficiario.ExcluirBeneficiario(Id);
             return Json("Cadastro excluído com sucesso");
         }
 
